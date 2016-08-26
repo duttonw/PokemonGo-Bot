@@ -1168,7 +1168,7 @@ class PokemonGoBot(Datastore):
                     'player_data',
                     sender=self,
                     level='debug',
-                    formatted='equipped_badges: {player_data}',
+                    formatted='player_data: {player_data}',
                     data={'player_data': self._player}
                 )
             if responses['responses']['CHECK_AWARDED_BADGES']['success'] == True:
@@ -1176,25 +1176,30 @@ class PokemonGoBot(Datastore):
                 self._awarded_badges = responses['responses']['CHECK_AWARDED_BADGES']
 
             if self._awarded_badges.has_key('awarded_badges'):
-                #todo: pull out the enum name and put into message
-                self.event_manager.emit(
-                    'badges',
-                    sender=self,
-                    level='info',
-                    formatted='awarded badge: {badge}, lvl {level}',
-                    data={'badge': BadgeType_pb2._BADGETYPE.values_by_number[self._awarded_badges['awarded_badges']].name,
-                          'level' : self._awarded_badges['awarded_badge_levels']}
-                )
+                i = 0
+                for badge in self._awarded_badges['awarded_badges'] :
+                    badgelevel = self._awarded_badges['awarded_badge_levels'][i]
+                    badgename = BadgeType_pb2._BADGETYPE.values_by_number[badge].name
+                    i += 1
+                    self.event_manager.emit(
+                        'badges',
+                        sender=self,
+                        level='info',
+                        formatted='awarded badge: {badge}, lvl {level}',
+                        data={'badge': badgename,
+                              'level' : badgelevel }
+                    )
 
+                #todo move equip badge into its own task once working
                 #should work but gives errors :'(
                 #response = self.api.equip_badge(badge_type=self._awarded_badges['awarded_badges'])
-                response = {'responses' :"awaiting further testing on api call to equip_badge"}
+                response = {'responses': "awaiting further testing on api call to equip_badge"}
                 self.event_manager.emit(
                     'badges',
                     sender=self,
                     level='info',
-                    formatted='equiped badge: {badges}',
-                    data={'badges': response['responses']}
+                    formatted='equiped badge: {badge}',
+                    data={'badge': response['responses']}
                 )
                 human_behaviour.action_delay(3,10)
 
