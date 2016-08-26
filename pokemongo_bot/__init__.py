@@ -11,8 +11,6 @@ import sys
 import time
 import Queue
 import threading
-import shelve
-import uuid
 
 from geopy.geocoders import GoogleV3
 from pgoapi import PGoApi
@@ -37,7 +35,9 @@ from worker_result import WorkerResult
 from tree_config_builder import ConfigException, MismatchTaskApiVersion, TreeConfigBuilder
 from inventory import init_inventory
 from sys import platform as _platform
+from pgoapi.protos.POGOProtos.Enums import BadgeType_pb2
 import struct
+
 
 class PokemonGoBot(Datastore):
     @property
@@ -74,6 +74,7 @@ class PokemonGoBot(Datastore):
             open(os.path.join(_base_dir, 'data', 'pokemon.json'))
         )
         self.item_list = json.load(open(os.path.join(_base_dir, 'data', 'items.json')))
+        # @var Metrics
         self.metrics = Metrics(self)
         self.latest_inventory = None
         self.cell = None
@@ -99,17 +100,6 @@ class PokemonGoBot(Datastore):
         self.heartbeat_counter = 0
         self.last_heartbeat = time.time()
 
-        self.capture_locked = False  # lock catching while moving to VIP pokemon
-
-        client_id_file_path = os.path.join(_base_dir, 'data', 'mqtt_client_id')
-        saved_info = shelve.open(client_id_file_path)
-        if saved_info.has_key('client_id'):
-            self.config.client_id = saved_info['client_id']
-        else:
-            client_uuid = uuid.uuid4()
-            self.config.client_id = str(client_uuid)
-            saved_info['client_id'] = self.config.client_id
-        saved_info.close()
 
     def start(self):
         self._setup_event_system()
@@ -148,6 +138,7 @@ class PokemonGoBot(Datastore):
             if self.config.websocket_remote_control:
                 remote_control = WebsocketRemoteControl(self).start()
 
+        # @var EventManager
         self.event_manager = EventManager(*handlers)
         self._register_events()
         if self.config.show_events:
@@ -587,6 +578,15 @@ class PokemonGoBot(Datastore):
         self.event_manager.register_event('pokestop_log')
         self.event_manager.register_event('softban_log')
 
+        self.event_manager.register_event(
+            'badges',
+            parameters=('badge', 'level')
+        )
+        self.event_manager.register_event(
+            'player_data',
+            parameters=('player_data', )
+        )
+
     def tick(self):
         self.health_record.heartbeat()
         self.cell = self.get_meta_cell()
@@ -847,7 +847,7 @@ class PokemonGoBot(Datastore):
         return full_path
 
     def _setup_api(self):
-        # instantiate pgoapi
+        # instantiate pgoapi @var ApiWrapper
         self.api = ApiWrapper(config=self.config)
 
         # provide player position on the earth
